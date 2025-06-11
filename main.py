@@ -1,4 +1,3 @@
-# main.py
 import os
 import argparse
 from config import GOOGLE_API_KEY
@@ -6,21 +5,17 @@ from video_processor import extract_frames
 from caption_generator import generate_caption
 
 def process_video(video_path: str):
-    """Processes a single video file to generate and print a caption."""
     print("-" * 50)
     print(f"Processing video: {os.path.basename(video_path)}")
     
     try:
-        # 1. Extract frames from the video
         image_frames = extract_frames(video_path)
         if not image_frames:
             print("Could not extract frames from the video.")
             return
 
-        # 2. Generate a caption using the AI model
         caption = generate_caption(image_frames, GOOGLE_API_KEY)
         
-        # 3. Print the result
         print(f"\n>>> Generated Caption:\n{caption}\n")
 
     except Exception as e:
@@ -39,7 +34,6 @@ def main():
     )
     args = parser.parse_args()
 
-    # Check for the GOOGLE_API_KEY
     if not GOOGLE_API_KEY:
         print("Error: GOOGLE_API_KEY not found in .env file.")
         print("Please create a .env file and add your key from Google AI Studio.")

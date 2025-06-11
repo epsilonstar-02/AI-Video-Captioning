@@ -29,7 +29,6 @@ def extract_frames(video_path: str, num_frames: int = 8) -> List[bytes]:
         cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
         ret, frame = cap.read()
         if ret:
-            # Encode frame to JPEG format in memory and return as bytes
             _, buffer = cv2.imencode(".jpg", frame)
             image_frames.append(buffer.tobytes())
 

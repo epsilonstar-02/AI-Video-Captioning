@@ -21,21 +21,16 @@ def generate_caption(base64_frames: List[str], api_key: str) -> str:
     """
     genai.configure(api_key=api_key)
 
-    # Convert frame bytes to PIL Image objects
     image_parts = []
     for frame_bytes in base64_frames:
-        # Convert bytes to numpy array
         nparr = np.frombuffer(frame_bytes, np.uint8)
-        # Decode image
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         if img is None:
             continue
-        # Convert BGR to RGB and create PIL Image
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         image = PIL.Image.fromarray(img_rgb)
         image_parts.append(image)
 
-    # Set up the model with stable configuration
     generation_config = {
         "temperature": 0.3,
         "top_p": 1.0,
@@ -43,10 +38,8 @@ def generate_caption(base64_frames: List[str], api_key: str) -> str:
         "max_output_tokens": 200,
     }
     
-    # Use the stable Gemini 1.5 Flash model
     model = genai.GenerativeModel('gemini-1.5-flash')
 
-    # Construct the prompt
     prompt = """
     You are an expert video analyst. Your task is to analyze these frames from a video and generate a single, descriptive caption that synthesizes the entire action.
 
@@ -68,14 +61,12 @@ def generate_caption(base64_frames: List[str], api_key: str) -> str:
     """
 
     try:
-        # Generate content with better error handling
         response = model.generate_content(
-            contents=[prompt] + image_parts[:1],  # Just use the first frame for now
+            contents=[prompt] + image_parts[:1],
             generation_config=generation_config,
             stream=False
         )
         
-        # Handle different response formats
         if hasattr(response, 'text'):
             return response.text.strip()
         elif hasattr(response, 'candidates') and response.candidates:
