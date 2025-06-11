@@ -1,20 +1,18 @@
+# video_processor.py
 import cv2
-import base64
 from typing import List
+import numpy as np
 
-def extract_frames(video_path: str, num_frames: int = 8) -> List[str]:
+def extract_frames(video_path: str, num_frames: int = 8) -> List[bytes]:
     """
-    Extracts a specified number of frames evenly from a video and encodes them in base64.
+    Extracts a specified number of frames evenly from a video.
 
     Args:
         video_path (str): The path to the video file.
         num_frames (int): The number of frames to extract.
 
     Returns:
-        List[str]: A list of base64-encoded image strings.
-        
-    Raises:
-        IOError: If the video file cannot be opened.
+        List[bytes]: A list of raw image data (as bytes).
     """
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -26,14 +24,14 @@ def extract_frames(video_path: str, num_frames: int = 8) -> List[str]:
 
     frame_indices = [int(i * total_frames / num_frames) for i in range(num_frames)]
     
-    base64_frames = []
+    image_frames = []
     for idx in frame_indices:
         cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
         ret, frame = cap.read()
         if ret:
+            # Encode frame to JPEG format in memory and return as bytes
             _, buffer = cv2.imencode(".jpg", frame)
-            base64_frame = base64.b64encode(buffer).decode("utf-8")
-            base64_frames.append(base64_frame)
+            image_frames.append(buffer.tobytes())
 
     cap.release()
-    return base64_frames
+    return image_frames

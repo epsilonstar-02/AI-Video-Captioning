@@ -1,49 +1,91 @@
-import requests
+# caption_generator.py
+import google.generativeai as genai
+import PIL.Image
+import cv2
+import numpy as np
 from typing import List
 
-API_URL = "https://api-inference.huggingface.co/models/llava-hf/llava-1.5-7b-hf"
-
-def generate_caption(base64_frames: List[str], api_token: str) -> str:
+def generate_caption(base64_frames: List[str], api_key: str) -> str:
     """
-    Generates a caption for a video by sending its frames to the Hugging Face API.
+    Generates a caption for a video using the Google Gemini Pro Vision API.
 
     Args:
         base64_frames (List[str]): A list of base64-encoded frames.
-        api_token (str): The Hugging Face API token for authentication.
+        api_key (str): The Google AI API key for authentication.
 
     Returns:
         str: The generated caption.
         
     Raises:
-        ConnectionError: If the API request fails.
+        Exception: If the API call fails.
     """
-    headers = {"Authorization": f"Bearer {api_token}"}
-    
-    image_placeholders = "".join(["<image>" for _ in base64_frames])
-    prompt_text = (
-        f"USER: {image_placeholders}These are frames from a single video. "
-        "Analyze them as a sequence and generate a single, cohesive caption. "
-        "Describe the video's style, subject, main action, and setting. "
-        "Do not describe each frame individually. "
-        "Provide only the final caption as your response. ASSISTANT:"
-    )
+    genai.configure(api_key=api_key)
 
-    payload = {
-        "inputs": prompt_text,
-        "parameters": {
-            "images": base64_frames,
-            "max_new_tokens": 200
-        }
+    # Convert frame bytes to PIL Image objects
+    image_parts = []
+    for frame_bytes in base64_frames:
+        # Convert bytes to numpy array
+        nparr = np.frombuffer(frame_bytes, np.uint8)
+        # Decode image
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if img is None:
+            continue
+        # Convert BGR to RGB and create PIL Image
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        image = PIL.Image.fromarray(img_rgb)
+        image_parts.append(image)
+
+    # Set up the model with stable configuration
+    generation_config = {
+        "temperature": 0.3,
+        "top_p": 1.0,
+        "top_k": 40,
+        "max_output_tokens": 200,
     }
+    
+    # Use the stable Gemini 1.5 Flash model
+    model = genai.GenerativeModel('gemini-1.5-flash')
+
+    # Construct the prompt
+    prompt = """
+    You are an expert video analyst. Your task is to analyze these frames from a video and generate a single, descriptive caption that synthesizes the entire action.
+
+    Follow this exact structure in your response:
+    1. Style: Begin with "In the style of a [video type]..." (e.g., cooking tutorial, personal vlog, sports broadcast)
+    2. Shot Type: Describe the camera work (e.g., this close-up shot, this wide shot)
+    3. Subject and Action: State who or what is the main subject and what they are doing
+    4. Setting and Context: Briefly describe the environment or context
+
+    Rules:
+    - Create a single, cohesive sentence
+    - Do not describe individual frames
+    - Do not use preambles or conversational phrases
+    - Be concise and focus on the most important information
+
+    Example: "In the style of a personal beauty vlog, this close-up shot shows a young woman with dark hair applying eyeshadow with a makeup brush to her right eyelid, looking directly into the camera against a simple, warm-toned wall."
+
+    Now analyze these frames and provide your caption:
+    """
 
     try:
-        response = requests.post(API_URL, headers=headers, json=payload, timeout=60)
-        response.raise_for_status()
-    except requests.RequestException as e:
-        raise ConnectionError(f"API request failed: {e}\nResponse: {response.text}")
-
-    result = response.json()
-    full_text = result[0].get("generated_text", "")
-    caption = full_text.split("ASSISTANT:")[-1].strip()
-    
-    return caption
+        # Generate content with better error handling
+        response = model.generate_content(
+            contents=[prompt] + image_parts[:1],  # Just use the first frame for now
+            generation_config=generation_config,
+            stream=False
+        )
+        
+        # Handle different response formats
+        if hasattr(response, 'text'):
+            return response.text.strip()
+        elif hasattr(response, 'candidates') and response.candidates:
+            if hasattr(response.candidates[0].content.parts[0], 'text'):
+                return response.candidates[0].content.parts[0].text.strip()
+        
+        return "Could not generate caption: Unexpected response format"
+        
+    except Exception as e:
+        error_msg = str(e)
+        if hasattr(e, 'response') and hasattr(e.response, 'text'):
+            error_msg += f"\nResponse: {e.response.text}"
+        raise Exception(f"Google Gemini API call failed: {error_msg}")
