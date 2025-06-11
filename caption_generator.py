@@ -61,8 +61,11 @@ def generate_caption(base64_frames: List[str], api_key: str) -> str:
     """
 
     try:
+        # Log the number of frames being processed
+        print(f"Processing {len(image_parts)} frames for caption generation...")
+        
         response = model.generate_content(
-            contents=[prompt] + image_parts[:1],
+            contents=[prompt] + image_parts,
             generation_config=generation_config,
             stream=False
         )
